@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        input[type="url"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        #status { margin-top: 15px; font-style: italic; }
+        .loader {
+            border: 5px solid #f3f3f3; /* Light grey */
+            border-top: 5px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+            display: none; /* Nascosto di default */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Video Downloader</h1>
+    <input type="url" id="videoUrl" placeholder="Incolla l'URL del video qui">
+    <button onclick="downloadVideo()">Scarica Video</button>
+    <div class="loader" id="loader"></div>
+    <div id="status"></div>
+
+    <script>
+        async function downloadVideo() {
+            const videoUrl = document.getElementById('videoUrl').value;
+            const statusDiv = document.getElementById('status');
+            const loader = document.getElementById('loader');
+            const downloadButton = document.querySelector('button');
+
+            if (!videoUrl) {
+                statusDiv.textContent = 'Per favore, inserisci un URL.';
+                statusDiv.style.color = 'red';
+                return;
+            }
+
+            statusDiv.textContent = 'Download in corso... Potrebbe richiedere del tempo.';
+            statusDiv.style.color = 'black';
+            loader.style.display = 'block';
+            downloadButton.disabled = true;
+
+            try {
+                const response = await fetch('/api/download-video', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: videoUrl })
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const contentDisposition = response.headers.get('content-disposition');
+                    let filename = "video_scaricato.mp4"; // Default
+
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?(.+?)"?(;|$)/i);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = decodeURIComponent(filenameMatch[1]);
+                        }
+                    }
+                    
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(link.href); // Pulisci
+                    statusDiv.textContent = `Download di "${filename}" avviato!`;
+                    statusDiv.style.color = 'green';
+                } else {
+                    const errorData = await response.json();
+                    statusDiv.textContent = 'Errore: ' + (errorData.error || response.statusText);
+                    statusDiv.style.color = 'red';
+                }
+            } catch (error) {
+                console.error('Errore:', error);
+                statusDiv.textContent = 'Errore di connessione o durante l_elaborazione.';
+                statusDiv.style.color = 'red';
+            } finally {
+                loader.style.display = 'none';
+                downloadButton.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
